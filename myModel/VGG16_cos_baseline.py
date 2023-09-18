@@ -93,7 +93,7 @@ def cosine_similarity(array1, array2):
 
     return cosine_similarity
 
-def compute_cosine_similarity_for_submission(extended_train_path, left_features_path, right_features_path):
+def compute_cosine_similarity_for_submission(extended_train_path, left_features_path, right_features_path, output_path):
     """
     Compute the cosine similarity for the left and right images and format the output similar to sample submission.
     """
@@ -136,7 +136,7 @@ def compute_cosine_similarity_for_submission(extended_train_path, left_features_
         print(f"Time elapsed: {end-start}; ")
 
     # save the extended_train_df to a csv file
-    extended_train_df.to_csv('../dataset/temp_test_submission.csv', index=False)
+    extended_train_df.to_csv(output_path, index=False)
 
     return extended_train_df
 
@@ -144,14 +144,16 @@ def compute_cosine_similarity_for_submission(extended_train_path, left_features_
 
 
 if __name__ == '__main__':
-    # extractor = VggFeatureExtractor()
-    # extractor.save_features('../dataset/train/right', f'../dataset/train/right_features_{target_size[0]}_{target_size[1]}.npz')
+    extractor = VggFeatureExtractor()
+    extractor.save_features('../dataset/train/right', f'../dataset/train/right_features_{target_size[0]}_{target_size[1]}.npz')
 
     # feature = load_specific_feature('../dataset/train/left_features.npz', 'agp.jpg')
     # plot_feature(feature, title='agp.jpg')
 
-    compute_cosine_similarity_for_submission('../dataset/extended_train.csv',
-                                             f'../dataset/train/left_features_{target_size[0]}_{target_size[1]}.npz',
-                                             f'../dataset/train/right_features_{target_size[0]}_{target_size[1]}.npz')
+    # compute_cosine_similarity_for_submission('../dataset/extended_train.csv',
+    #                                          f'../dataset/train/left_features_{target_size[0]}_{target_size[1]}.npz',
+    #                                          f'../dataset/train/right_features_{target_size[0]}_{target_size[1]}.npz',
+    #                                          '../dataset/temp_test_submission.csv')
+    # 0.4325
 
 
