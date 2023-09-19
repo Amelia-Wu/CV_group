@@ -52,11 +52,44 @@ class ExtendedDataset:
             print("Please generate the extended data first.")
 
 
+def generate_dataset(file_to_transform, ground_truth_file):
+    """
+    Generate dataset from the format of the original extended_train.csv/test_candidates.csv into the format of data pairs.
+    file_to_transform: the file to transform (like extended_train.csv/ test_candidates.csv)
+    ground_truth_file: the ground truth file (like train.csv), we will use it to add labels to the generated dataset.
+    :return: Path to the generated dataset
+    """
+    df = pd.read_csv(file_to_transform, index_col=None)
+    melted_df = df.melt(id_vars=["left"], value_name="right")
+    # 删除临时列variable
+    melted_df.drop(columns=['variable'], inplace=True)
+
+    # 读取ground_truth_file并设置left为index
+    ground_truth_df = pd.read_csv(ground_truth_file)
+
+    # 使用join方法将melted_df和ground_truth_df进行合并
+    merged_df = melted_df.join(ground_truth_df, rsuffix='_ground_truth', how='left')
+
+    # 比较melted_df中的right列和ground_truth_df中的right列是否匹配
+    merged_df['label'] = (merged_df['right'] == merged_df['right_ground_truth']).astype(int)
+
+    # 删除临时列right_ground_truth
+    merged_df.drop(columns=['right_ground_truth'], inplace=True)
+    # 删除临时列 left_ground_truth
+    merged_df.drop(columns=['left_ground_truth'], inplace=True)
+
+    # 保存到新的CSV文件
+    output_path = file_to_transform.split('.')[0] + 'dataset_generated.csv'
+    merged_df.to_csv(output_path)
+
+    return output_path
 
 
 if __name__ == '__main__':
+    #
+    # dataset = ExtendedDataset(train_csv_path)
+    # dataset.generate_extended_data()
+    # dataset.save_to_csv(output_path)
 
-    dataset = ExtendedDataset(train_csv_path)
-    dataset.generate_extended_data()
-    dataset.save_to_csv(output_path)
+    generate_dataset('../dataset/extended_train.csv', '../dataset/train.csv')
 

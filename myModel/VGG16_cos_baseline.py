@@ -2,7 +2,7 @@ import time
 
 import numpy as np
 import os
-
+from utils.npz_file_reader import NPZReader
 import pandas as pd
 from keras import Model
 from tensorflow.keras.applications import VGG16
@@ -106,26 +106,18 @@ def compute_cosine_similarity_for_submission(extended_train_path, left_features_
     num_cols = extended_train_df.shape[1]
 
     # Load the .npz file
-    left_data = np.load(left_features_path)
-    left_filenames = left_data['filenames']
-    left_features = left_data['features']
-
-    right_data = np.load(right_features_path)
-    right_filenames = right_data['filenames']
-    right_features = right_data['features']
+    npzReader = NPZReader(left_features_path, right_features_path)
 
     # Iterate over each row in the extended_train_df
     for index, row in extended_train_df.iterrows():
         print("Processing row: ", index)
         start = time.time()
         left_image = row[0]+'.jpg'
-        ind = np.where(left_filenames == left_image)[0][0]
-        left_feature = left_features[ind]
+        left_feature = npzReader.get_feature(left_image)
 
         for i in range(1, num_cols):  # Assuming there are 20 right images per row
             right_image = row[i]+'.jpg'
-            right_ind = np.where(right_filenames == right_image)[0][0]
-            right_feature = right_features[right_ind]
+            right_feature = npzReader.get_feature(right_image)
 
             # Compute cosine similarity
             similarity = cosine_similarity(left_feature, right_feature)[0][0]
@@ -139,6 +131,7 @@ def compute_cosine_similarity_for_submission(extended_train_path, left_features_
     extended_train_df.to_csv(output_path, index=False)
 
     return extended_train_df
+
 
 
 
