@@ -1,9 +1,15 @@
 import os
 import random
 
+import numpy as np
 import pandas as pd
 
 import os
+
+from keras_preprocessing.image import load_img
+from matplotlib import pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
 
 train_right = "../dataset/train/right"  # the directory of right images
 train_csv_path = "../dataset/train.csv"  # the original train.csv
@@ -85,11 +91,122 @@ def generate_dataset(file_to_transform, ground_truth_file):
     return output_path
 
 
+import tensorflow as tf
+
+
+
+
+class ImagePairsDataset:
+    """
+    # 示例使用：
+    # train_image_pairs = [('path/to/image1a.jpg', 'path/to/image1b.jpg'), ...]
+    # train_labels = [1, ...]
+    # train_dataset = ImagePairsDataset(train_image_pairs, train_labels).get_dataset()
+    """
+    def __init__(self, image_pairs, labels, batch_size=32, shuffle=True):
+        self.image_pairs = image_pairs
+        self.labels = labels
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.dataset = self._create_dataset()
+
+    def _load_img(self, img_path1, img_path2, label):
+        try:
+            img1 = tf.io.read_file(img_path1)
+            img1 = tf.image.decode_jpeg(img1, channels=3)
+            img1 = tf.image.resize(img1, [224, 224])
+            img1 = img1 / 255.0
+        except Exception as e:
+            print(f"Error processing {img_path1}: {e}")
+            return None, label
+
+        try:
+            img2 = tf.io.read_file(img_path2)
+            img2 = tf.image.decode_jpeg(img2, channels=3)
+            img2 = tf.image.resize(img2, [224, 224])
+            img2 = img2 / 255.0
+        except Exception as e:
+            print(f"Error processing {img_path2}: {e}")
+            return None, label
+
+        return tf.subtract(img1, img2), label
+
+    def _create_dataset(self):
+        img1_paths = [pair[0] for pair in self.image_pairs]
+        img2_paths = [pair[1] for pair in self.image_pairs]
+
+        dataset = tf.data.Dataset.from_tensor_slices((img1_paths, img2_paths, self.labels))
+        dataset = dataset.map(self._load_img, num_parallel_calls=tf.data.AUTOTUNE)  #TODO: map干啥的
+
+
+        if self.shuffle:
+            dataset = dataset.shuffle(buffer_size=len(self.labels), seed=42)
+
+        dataset = dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+        return dataset
+
+    def get_dataset(self):
+        return self.dataset
+
+
+def get_data_pairs(csv_path, img_path_prefix='../dataset/train', img_suffix='.jpg', val_ratio=0.2):
+    """
+    Read image pairs from CSV files, process their paths, disrupt the data, and split into training and validation datasets.
+
+    参数：
+    - csv_path: The path to the CSV file containing the image pairs and labels.
+    - img_path_prefix: The prefix of the image file path.
+    - img_suffix: The suffix of the image file name.
+    - val_ratio: Proportion of validation sets.
+
+    返回：
+    - train_dataset
+    - val_dataset
+    """
+    # 从CSV读取数据
+    data = pd.read_csv(csv_path)
+    image_pairs = list(zip(data['left'].values, data['right'].values))
+    labels = data['label'].values.tolist()
+    # 创建一个OneHotEncoder对象
+    encoder = OneHotEncoder(sparse=False)
+
+    # 将标签列表转换为NumPy数组并重塑以匹配OneHotEncoder的输入要求
+    labels = np.array(labels).reshape(-1, 1)
+
+    # 进行独热编码
+    one_hot_labels = encoder.fit_transform(labels)
+
+    # 处理图像路径
+    image_pairs = [(img_path_prefix + "/left/" + img1 + img_suffix, img_path_prefix + "/right/" + img2 + img_suffix) for img1, img2 in
+                   image_pairs]
+
+    # 打乱并分割数据
+    train_image_pairs, val_image_pairs, train_labels, val_labels = train_test_split(
+        image_pairs, one_hot_labels, test_size=val_ratio, random_state=42)
+
+    # 创建tf.data.Dataset对象
+    train_dataset = ImagePairsDataset(train_image_pairs, train_labels).get_dataset()
+    val_dataset = ImagePairsDataset(val_image_pairs, val_labels, shuffle=False).get_dataset()
+
+    return train_dataset, val_dataset
+
+
 if __name__ == '__main__':
-    #
+    pass
     # dataset = ExtendedDataset(train_csv_path)
     # dataset.generate_extended_data()
     # dataset.save_to_csv(output_path)
 
-    generate_dataset('../dataset/extended_train.csv', '../dataset/train.csv')
+    # generate_dataset('../dataset/extended_train.csv', '../dataset/train.csv')
+
+    train_dataset, val_dataset = get_data_pairs('E:/3Melbourne_uni_2023_S2/cv/assignment/Group/code/utils/dataset_generated.csv')
+
+
+
+
+
+
+
+
+# ('../dataset/train/left/aaa.jpg', '../dataset/train/right/osr.jpg')
 
