@@ -5,11 +5,12 @@ from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing import image
+from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-generated_data = pd.read_csv('./utils/dataset_generated.csv')
+generated_data = pd.read_csv('./utils/new_data.csv')
 class FineTunedModel:
     def __init__(self):
         # Define the ResNet50 base model (pre-trained and without top classification layers)
@@ -36,11 +37,9 @@ class FineTunedModel:
 
     def combine_features(self, left_img_path, right_img_path):
         left_features = self.extract(left_img_path)
-        # print(left_features)
         right_features = self.extract(right_img_path)
-        # print(right_features)
         # Add left features and right features together
-        combined_features = np.concatenate((left_features, right_features), axis=1)
+        combined_features = left_features + right_features
         # self.combine_features_list.append(combined_features)
         return combined_features
 
@@ -50,15 +49,36 @@ class FineTunedModel:
             left_img, right_img, label = row['left'], row['right'], row['label']
             left_img_path = './dataset/train/left/' + left_img + '.jpg'
             right_img_path = './dataset/train/right/' + right_img + '.jpg'
-            combined_feature = self.combine_features(left_img_path, right_img_path)[0][0]
+            combined_feature = self.combine_features(left_img_path, right_img_path)
+            print(combined_feature)
             combined_feature_list.append(combined_feature)
         return combined_feature_list
 
     def split_data(self):
         all_data = generated_data.iloc[1:]
-        all_features = self.get_feature_label_data(all_data)
-        all_labels = all_data.iloc[:, -1:].to_numpy()
-        x_train, x_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3)
+        all_features = np.array(self.get_feature_label_data(all_data))
+        all_labels = np.array(all_data.iloc[:, -1:].to_numpy())
+
+        # Create an array of indices
+        num_samples = len(all_data)  # Replace 'data' with your dataset
+        indices = np.arange(num_samples)
+        np.random.shuffle(indices)
+
+        # Determine the split size
+        split_ratio = 0.7  # for a 70-30 split
+        split_index = int(split_ratio * num_samples)
+
+        # Split the indices
+        train_indices = indices[:split_index]
+        test_indices = indices[split_index:]
+
+        # Create the training and testing sets based on the selected indices
+        x_train = all_features[train_indices]
+        y_train = all_labels[train_indices]
+        x_test = all_features[test_indices]
+        y_test = all_labels[test_indices]
+
+        # x_train, x_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3)
         return x_train, x_test, y_train, y_test
 
     def train(self, x_train, y_train):
@@ -70,7 +90,7 @@ class FineTunedModel:
                                          verbose=1)
         # Plot the accuracy of train dataset and validation dataset
         plt.plot(resnet_training.history['accuracy'], label='Train')
-        plt.plot(resnet_training.history['val_accuracy'], label='Validation')
+        # plt.plot(resnet_training.history['val_accuracy'], label='Validation')
         plt.xticks(np.arange(0, 20, step=2))
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
