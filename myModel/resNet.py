@@ -1,7 +1,7 @@
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing import image
@@ -28,7 +28,7 @@ class FineTunedModel:
         img_array = image.img_to_array(img)
         # Convert to a batch of size (1, 224, 224, 3)
         expanded_img_array = np.expand_dims(img_array, axis=0)
-        # Preprocess the input for VGG16 model
+        # Preprocess the input for Resnet model
         preprocessed_img = preprocess_input(expanded_img_array)
         # Get features
         features = self.model.predict(preprocessed_img)
@@ -36,9 +36,11 @@ class FineTunedModel:
 
     def combine_features(self, left_img_path, right_img_path):
         left_features = self.extract(left_img_path)
+        # print(left_features)
         right_features = self.extract(right_img_path)
+        # print(right_features)
         # Add left features and right features together
-        combined_features = left_features + right_features
+        combined_features = np.concatenate((left_features, right_features), axis=1)
         # self.combine_features_list.append(combined_features)
         return combined_features
 
@@ -90,8 +92,8 @@ class FineTunedModel:
         img = np.expand_dims(img, axis=0)
 
         predictions = self.model.predict(img)
-        predicted_class = np.argmax(predictions)
-        return predicted_class
+        probability_of_class_1 = predictions[0][0]
+        return probability_of_class_1
 
     def save(self, path):
 
