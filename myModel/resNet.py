@@ -5,12 +5,14 @@ from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing import image
-from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import time
 
-generated_data = pd.read_csv('./utils/new_data.csv')
+generated_data = pd.read_csv('./utils/dataset_generated.csv')
+test_candidates_data = pd.read_csv('./dataset/test_candidates.csv')
+
 class FineTunedModel:
     def __init__(self):
         # Define the ResNet50 base model (pre-trained and without top classification layers)
@@ -22,42 +24,37 @@ class FineTunedModel:
         # Create a new model with the ResNet50 backbone and the custom output layer
         self.model = Model(inputs=resnet_model.input, outputs=output)
 
-    def extract(self, img_path):
+    def process_img(self, img_path):
         # Load image with size (224, 224)
         img = image.load_img(img_path, target_size=(224, 224))
         # Convert image to array
         img_array = image.img_to_array(img)
-        # Convert to a batch of size (1, 224, 224, 3)
-        expanded_img_array = np.expand_dims(img_array, axis=0)
         # Preprocess the input for Resnet model
-        preprocessed_img = preprocess_input(expanded_img_array)
-        # Get features
-        features = self.model.predict(preprocessed_img)
-        return features
+        preprocessed_img = preprocess_input(img_array)
+        return preprocessed_img
 
-    def combine_features(self, left_img_path, right_img_path):
-        left_features = self.extract(left_img_path)
-        right_features = self.extract(right_img_path)
+    def combine_img(self, left_img_path, right_img_path):
+        left_img = self.process_img(left_img_path)
+        right_img = self.process_img(right_img_path)
         # Add left features and right features together
-        combined_features = left_features + right_features
-        # self.combine_features_list.append(combined_features)
-        return combined_features
+        combined_imgs = left_img + right_img
+        # print(combined_imgs)
+        return combined_imgs
 
-    def get_feature_label_data(self, dataset):
-        combined_feature_list = []
+    def get_combined_img_list(self, dataset):
+        combined_img_list = []
         for index, row in dataset.iterrows():
             left_img, right_img, label = row['left'], row['right'], row['label']
             left_img_path = './dataset/train/left/' + left_img + '.jpg'
             right_img_path = './dataset/train/right/' + right_img + '.jpg'
-            combined_feature = self.combine_features(left_img_path, right_img_path)
-            print(combined_feature)
-            combined_feature_list.append(combined_feature)
-        return combined_feature_list
+            combined_img = self.combine_img(left_img_path, right_img_path)
+            combined_img_list.append(combined_img)
+        return combined_img_list
 
     def split_data(self):
         all_data = generated_data.iloc[1:]
-        all_features = np.array(self.get_feature_label_data(all_data))
-        all_labels = np.array(all_data.iloc[:, -1:].to_numpy())
+        all_imgs = np.array(self.get_combined_img_list(all_data))
+        all_labels = np.array(all_data.iloc[:, -1].to_numpy())
 
         # Create an array of indices
         num_samples = len(all_data)  # Replace 'data' with your dataset
@@ -73,24 +70,24 @@ class FineTunedModel:
         test_indices = indices[split_index:]
 
         # Create the training and testing sets based on the selected indices
-        x_train = all_features[train_indices]
+        x_train = all_imgs[train_indices]
         y_train = all_labels[train_indices]
-        x_test = all_features[test_indices]
+        x_test = all_imgs[test_indices]
         y_test = all_labels[test_indices]
 
-        # x_train, x_test, y_train, y_test = train_test_split(all_features, all_labels, test_size=0.3)
+        # x_train, x_test, y_train, y_test = train_test_split(all_imgs, all_labels, test_size=0.3)
         return x_train, x_test, y_train, y_test
 
     def train(self, x_train, y_train):
         self.model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         resnet_training = self.model.fit(x=np.asarray(x_train),
                                          y=np.asarray(y_train),
-                                         epochs=10,
+                                         epochs=20,
                                          batch_size=100,
                                          verbose=1)
+
         # Plot the accuracy of train dataset and validation dataset
         plt.plot(resnet_training.history['accuracy'], label='Train')
-        # plt.plot(resnet_training.history['val_accuracy'], label='Validation')
         plt.xticks(np.arange(0, 20, step=2))
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
@@ -104,16 +101,35 @@ class FineTunedModel:
         loss, accuracy = self.model.evaluate(x_test, y_test)
         print(f'Loss: {loss}, Accuracy: {accuracy}')
 
-    def predict(self, image_path):
+    def predict(self, dataset, output_path):
+        num_cols = dataset.shape[1]
+        for index, row in dataset.iterrows():
+            print("Processing row: ", index)
+            start = time.time()
+            left_img = row['left']
+            left_img_path = './dataset/test/left/' + left_img + '.jpg'
 
-        img = image.load_img(image_path, target_size=(224,224))
-        img = image.img_to_array(img)
-        img = preprocess_input(img)
-        img = np.expand_dims(img, axis=0)
+            for i in range(1, num_cols):
+                right_img = row[i]
+                right_img_path = './dataset/test/right/' + right_img + '.jpg'
+                combined_img = self.combine_img(left_img_path, right_img_path)
 
-        predictions = self.model.predict(img)
-        probability_of_class_1 = predictions[0][0]
-        return probability_of_class_1
+                img = image.img_to_array(combined_img)
+                img = preprocess_input(img)
+                img = np.expand_dims(img, axis=0)
+
+                predictions = self.model.predict(img)
+                probability_of_class_1 = predictions[0][0]
+
+                # Replace the filename with the similarity value
+                dataset.iloc[index, i] = probability_of_class_1
+
+            end = time.time()
+            print(f"Time elapsed: {end - start}; ")
+        # save the extended_train_df to a csv file
+        dataset.to_csv(output_path, index=False)
+
+        return dataset
 
     def save(self, path):
 
