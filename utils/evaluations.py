@@ -1,7 +1,7 @@
 import pandas as pd
 
 top_k = 2
-def evaluate(file_to_evaluation, lookup_table, ground_truth_table):
+def evaluate(file_to_evaluation, lookup_table, ground_truth_table, outPutPath):
     # 读取file_to_evaluation.csv文件, 选出每行最大的两个值，记住它们的索引
     df = pd.read_csv(file_to_evaluation)
     df_values = df.iloc[:, 1:]
@@ -50,7 +50,7 @@ def evaluate(file_to_evaluation, lookup_table, ground_truth_table):
 
 
     # 储存到csv文件
-    df.to_csv("../outputFile/temp_test_evaluation.csv", index=False)
+    df.to_csv(outPutPath, index=False)
 
 
 
