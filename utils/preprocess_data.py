@@ -8,6 +8,7 @@ import os
 train_right = "../dataset/train/right"  # the directory of right images
 train_csv_path = "../dataset/train.csv"  # the original train.csv
 output_path = "../dataset/extended_train.csv"  # where to save the extended data
+# output_path = "../dataset/test_accuracy.csv"
 right_img_num = 20  # how many right images for each left image
 
 def get_filenames_in_directory(directory_path):
@@ -79,7 +80,8 @@ def generate_dataset(file_to_transform, ground_truth_file):
     merged_df.drop(columns=['left_ground_truth'], inplace=True)
 
     # 保存到新的CSV文件
-    output_path = file_to_transform.split('.')[0] + 'dataset_generated.csv'
+    output_path = file_to_transform.split('.')[0] + 'test_accuracy_generated.csv'
+    # output_path = file_to_transform.split('.')[0] + 'dataset_generated.csv'
     merged_df.to_csv(output_path)
 
     return output_path
