@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
+from tensorflow.keras.metrics import Recall
+
 
 generated_data = pd.read_csv('./utils/dataset_generated.csv')
 # test_candidates_data = pd.read_csv('./dataset/test_candidates.csv')
@@ -95,7 +97,7 @@ class FineTunedModel:
         return x_train, x_test, y_train, y_test
 
     def train(self, x_train, y_train, x_val, y_val):
-        self.model.compile(loss='binary_crossentropy', optimizer=Adam(learning_rate=0.001), metrics=['accuracy'])
+        self.model.compile(loss='binary_crossentropy', optimizer=Adam(learning_rate=0.0002), metrics=[Recall()])
         resnet_training = self.model.fit(x=np.asarray(x_train),
                                          y=np.asarray(y_train),
                                          epochs=20,
