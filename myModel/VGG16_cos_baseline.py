@@ -2,6 +2,9 @@ import time
 
 import numpy as np
 import os
+
+from sklearn.svm import SVC
+
 from utils.npz_file_reader import NPZReader
 import pandas as pd
 from keras import Model
@@ -132,13 +135,88 @@ def compute_cosine_similarity_for_submission(extended_train_path, left_features_
 
     return extended_train_df
 
+def svm_for_submission(extended_train_path, left_features_path, right_features_path):
+
+    extended_train_df = pd.read_csv(extended_train_path)
+    # 列数
+    num_cols = extended_train_df.shape[1]
+
+    # Load the .npz file
+    npzReader = NPZReader(left_features_path, right_features_path)
+
+
+    features = []
+    labels = []
+    # Iterate over each row in the extended_train_df
+    for index, row in extended_train_df.iterrows():
+        print("Processing row: ", index)
+        start = time.time()
+        left_image = row[0]+'.jpg'
+        left_feature = npzReader.get_feature(left_image)
+
+        for i in range(1, num_cols):  # Assuming there are 20 right images per row
+            right_image = row[i]+'.jpg'
+            right_feature = npzReader.get_feature(right_image)
+
+            # combine left_feature and right_feature
+            feature = np.concatenate((left_feature, right_feature), axis=1)
+            feature_squeezed = np.squeeze(feature)
+            features.append(feature_squeezed)
+
+            # label
+            if i == 1:
+                labels.append(1)
+            else:
+                labels.append(0)
+        end = time.time()
+        print(f"Time elapsed: {end-start}; ")
+
+    return features, labels
+
+
+def svm_predict(extended_train_path, left_features_path, right_features_path, features, labels, output_path):
+    svm = SVC(probability=True, random_state=42)
+    print("start fitting")
+    svm.fit(features, labels)
+
+    extended_train_df = pd.read_csv(extended_train_path)
+    # 列数
+    num_cols = extended_train_df.shape[1]
+
+    # Load the .npz file
+    npzReader = NPZReader(left_features_path, right_features_path)
+
+    # Iterate over each row in the extended_train_df
+    for index, row in extended_train_df.iterrows():
+        print("Processing row: ", index)
+        start = time.time()
+        left_image = row[0] + '.jpg'
+        left_feature = npzReader.get_feature(left_image)
+
+        for i in range(1, num_cols):  # Assuming there are 20 right images per row
+            right_image = row[i] + '.jpg'
+            right_feature = npzReader.get_feature(right_image)
+
+            feature = np.concatenate((left_feature, right_feature), axis=0)
+            # Compute cosine similarity
+            probability = svm.predict_proba(feature)[1]
+
+            # Replace the filename with the similarity value
+            extended_train_df.iloc[index, i] = probability
+        end = time.time()
+        print(f"Time elapsed: {end - start}; ")
+
+        # save the extended_train_df to a csv file
+    extended_train_df.to_csv(output_path, index=False)
+
+    return extended_train_df
 
 
 
 
 if __name__ == '__main__':
-    extractor = VggFeatureExtractor()
-    extractor.save_features('../dataset/train/right', f'../dataset/train/right_features_{target_size[0]}_{target_size[1]}.npz')
+    # extractor = VggFeatureExtractor()
+    # extractor.save_features('../dataset/train/right', f'../dataset/train/right_features_{target_size[0]}_{target_size[1]}.npz')
 
     # feature = load_specific_feature('../dataset/train/left_features.npz', 'agp.jpg')
     # plot_feature(feature, title='agp.jpg')
@@ -149,4 +227,6 @@ if __name__ == '__main__':
     #                                          '../dataset/temp_test_submission.csv')
     # 0.4325
 
+    features, labels = svm_for_submission('../dataset/extended_train.csv', '../dataset/train/left_features_224_224.npz', '../dataset/train/right_features_224_224.npz')
+    svm_predict('../dataset/test_accuracy.csv', '../dataset/train/left_features_224_224.npz', '../dataset/train/right_features_224_224.npz', features, labels, '../dataset/temp_test_accuracy.csv')
 

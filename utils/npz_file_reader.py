@@ -2,6 +2,13 @@ import numpy as np
 
 
 class NPZReader():
+    """
+    Read the npz file and return the feature vector for a given image.
+    Sample usage:
+        npzReader = NPZReader(left_features_path, right_features_path)
+        feature = npzReader.get_feature(image_name)
+
+    """
     def __init__(self, left_features_path, right_features_path):
         self.left_data = np.load(left_features_path)
         self.left_filenames = self.left_data['filenames']
